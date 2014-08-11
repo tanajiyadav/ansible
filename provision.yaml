@@ -1,0 +1,48 @@
+---
+# This playbook is an example for deploying multiple instances into
+# EC2/Euca and "doing something" with them.
+#  
+# - uses the ec2 and ec2_vol module.
+#
+# Run this with ansible-playbook and supply the private key for your
+# EC2/Euca user (to access the instance in the second play), e.g:
+# 
+# ansible-playbook eucalyptus-ec2-deploy.yml -v --private-key=/path/to/ec2/pri/key
+#
+
+# The play operates on the local (Ansible control) machine.
+- name: Stage instance(s)
+  hosts: local
+  connection: local
+  user: root
+  gather_facts: false
+
+  vars:
+      keypair: tanaji
+      instance_type: t1.micro
+      security_group: ep2
+      image: ami-aa8bfe9a
+      region: us-west-2
+      zone: us-west-2a
+
+  # Launch 5 instances with the following parameters.  Register the output.
+
+  tasks:
+    - name: Launch instance 
+      ec2: keypair={{keypair}} group={{security_group}}
+           instance_type={{instance_type}} image={{image}}
+           wait=true count=1 region={{region}} zone={{zone}}
+      register: ec2
+    
+    # Use with_items to add each instances public IP to a new hostgroup for use in the next play.
+
+#    - name: Wait for the instances to boot by checking the ssh port
+#      wait_for: host={{item.public_dns_name}} port=22 delay=60 timeout=320 state=started
+#      with_items: ec2.instances
+
+    # Use the ec2_vol module to create volumes for attachment to each instance.
+    # Use with_items to attach to each instance (by returned id) launched previously.
+
+    - name: Create a volume and attach
+      ec2_vol: volume_size=20 instance={{item.id}} region={{region}} zone={{zone}} 
+      with_items: ec2.instances
